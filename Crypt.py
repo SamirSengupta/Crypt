@@ -2,53 +2,32 @@ import requests
 import pandas as pd
 import streamlit as st
 
-
-def get_cryptocurrency_recommendation(investment_amount):
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,dogecoin,litecoin,ripple&vs_currencies=inr"
+# Fetch cryptocurrency data from CoinGecko API
+def fetch_crypto_data():
+    url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false"
     response = requests.get(url)
     data = response.json()
+    return data
+
+# Suggest cryptocurrency to buy based on investment amount and time duration
+def suggest_crypto(investment_amount, investment_duration):
+    data = fetch_crypto_data()
     df = pd.DataFrame(data)
+    df = df[['id', 'symbol', 'current_price', 'market_cap_rank']]
+    df['monthly_investment'] = investment_amount / investment_duration
+    df['total_investment'] = investment_amount
+    df['potential_profit'] = df['monthly_investment'] * df['market_cap_rank']
+    df = df.sort_values(by='potential_profit', ascending=True)
+    return df.head(1)
 
-    if 'inr' not in df.columns:
-        st.error("API response is incorrect.")
-        return None, None, None
+# Streamlit front-end
+st.title("Tony Stark's Crypto Investment Advisor")
 
-    df = df.transpose()
-    df['inr'] = pd.to_numeric(df['inr'])
-    df['value'] = investment_amount / df['inr']
-    df = df.sort_values('value', ascending=False)
-    recommendation = df.iloc[0].name
-    change_url = f"https://api.coingecko.com/api/v3/coins/{recommendation}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false"
-    change_response = requests.get(change_url)
-    change_data = change_response.json()
-    change_percent = change_data['market_data']['price_change_percentage_24h']
-    if change_percent > 0:
-        reason = f"{recommendation} has increased by {change_percent:.2f}% in the last 24 hours."
-    elif change_percent < 0:
-        reason = f"{recommendation} has decreased by {abs(change_percent):.2f}% in the last 24 hours."
-    else:
-        reason = f"{recommendation} has remained stable in the last 24 hours."
-    df['change_url'] = df.index.map(
-        lambda x: f"https://api.coingecko.com/api/v3/coins/{x}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false")
-    df['change_response'] = df['change_url'].map(requests.get)
-    df['change_data'] = df['change_response'].map(lambda x: x.json())
-    df['change_percent'] = df['change_data'].map(lambda x: x['market_data']['price_change_percentage_24h'])
-    return recommendation, reason, df
+investment_amount = st.number_input("Enter the total amount you're willing to invest (in USD):", min_value=1000.0, step=1000.0)
+investment_duration = st.number_input("Enter the investment duration (in months):", min_value=1, max_value=12, step=1)
 
+if st.button("Suggest Cryptocurrency"):
+    suggestion = suggest_crypto(investment_amount, investment_duration)
+    st.write(f"Based on your investment amount and duration, I suggest you invest in {suggestion.iloc[0]['id'].capitalize()} ({suggestion.iloc[0]['symbol'].upper()}).")
 
-st.title("Cryptocurrency Recommendation Tool")
-
-investment_amount = st.number_input("Enter the amount you want to invest in INR:", value=1000, step=1000)
-if investment_amount > 0:
-    recommendation, reason, df = get_cryptocurrency_recommendation(investment_amount)
-    if recommendation is None:
-        st.warning("Unable to get a recommendation. Please try again later.")
-    else:
-        st.write(f"Based on your investment amount of {investment_amount} INR, we recommend buying {recommendation}. {reason}")
-        st.write("Here are the top 3 cryptocurrencies you may consider:")
-        top_3 = df.iloc[1:4][['value', 'change_percent']]
-        st.table(top_3)
-        st.write("Here are the current values of all the cryptocurrencies:")
-        st.table(df[['inr', 'change_percent']])
-else:
-    st.warning("Please enter a valid investment amount.")
+st.write("As for the platform to buy cryptocurrency, I recommend using reputable exchanges like Coinbase, Binance, or Kraken. Always do your own research and consider the fees, security, and user experience before choosing a platform.")
