@@ -21,7 +21,7 @@ def suggest_crypto(investment_amount, investment_duration):
     return df.head(1)
 
 # Streamlit front-end
-st.title("Tony Stark's Crypto Investment Advisor")
+st.title("Crypt: A Crypto Investment Advisor")
 
 investment_amount = st.number_input("Enter the total amount you're willing to invest (in USD):", min_value=1000.0, step=1000.0)
 investment_duration = st.number_input("Enter the investment duration (in months):", min_value=1, max_value=12, step=1)
